@@ -1,0 +1,315 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>OLML Resolver</title>
+    <link rel="stylesheet" href="./styles.css">
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <div class="brand">
+          <picture class="brand-mark">
+            <source srcset="./assets/OLML_Logo_W.svg" media="(prefers-color-scheme: dark)">
+            <img src="./assets/OLML_Logo_B.svg" alt="" aria-hidden="true">
+          </picture>
+          <span>OLML Resolver</span>
+        </div>
+        <div class="toolbar" role="toolbar" aria-label="Package actions">
+          <button class="toolbar-button" id="openButton" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.75 6.25h6.1l1.8 2h8.6v9.5a2 2 0 0 1-2 2H5.75a2 2 0 0 1-2-2V6.25Z"/><path d="M3.75 8.25V5.5a1.25 1.25 0 0 1 1.25-1.25h4.25l1.85 2"/></svg>
+            Open File
+          </button>
+          <button class="toolbar-button" id="newButton" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6.75 3.75h7.1l3.4 3.4v13.1H6.75V3.75Z"/><path d="M13.75 3.85V7.25h3.4"/></svg>
+            New File
+          </button>
+          <button class="toolbar-button" id="scanButton" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 8V5h3"/><path d="M16 5h3v3"/><path d="M19 16v3h-3"/><path d="M8 19H5v-3"/><path d="M8 12h8"/><path d="M12 8v8"/></svg>
+            Scan
+          </button>
+          <button class="toolbar-button" id="exportButton" type="button">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4.25v10"/><path d="m8.25 8 3.75-3.75L15.75 8"/><path d="M5.25 13.75v5h13.5v-5"/></svg>
+            Export File
+          </button>
+        </div>
+        <input id="fileInput" type="file" accept=".olml,.zip,application/zip" hidden>
+      </header>
+
+      <main class="workspace">
+        <section class="main-panel" id="dropZone">
+          <section class="empty-state" id="emptyState">
+            <button class="file-dropbox" id="emptyDropButton" type="button">
+              <span>Drag OLML File To Open</span>
+            </button>
+            <div class="empty-actions">
+              <button class="primary-action" id="emptyNewButton" type="button">New File</button>
+              <button class="primary-action" id="emptyScanButton" type="button">Scan</button>
+            </div>
+          </section>
+
+          <section class="new-flow hidden" id="newFlow">
+            <div class="choice-row">
+              <button class="choice-pill active" id="newObjectChoiceButton" type="button">New Object</button>
+              <button class="choice-pill" id="existingObjectChoiceButton" type="button">Existing Object</button>
+            </div>
+            <section class="existing-object-picker hidden" id="existingObjectPicker">
+              <label for="existingObjectSelect">Object Title</label>
+              <select id="existingObjectSelect">
+                <option value="">Choose a saved local object</option>
+              </select>
+              <button class="primary-action compact" id="confirmExistingObjectButton" type="button">Confirm</button>
+              <p class="small-muted">Existing objects come from packages saved or imported into this browser-local library.</p>
+            </section>
+            <section class="existing-object-list hidden" id="existingObjectPackageList"></section>
+            <div class="new-flow-actions">
+              <button class="primary-action compact back-action" id="newFlowBackButton" type="button">Back</button>
+            </div>
+          </section>
+
+          <section class="scanner hidden" id="scanner" aria-labelledby="scannerTitle">
+            <div class="scanner-heading">
+              <div>
+                <p class="eyebrow">Local library resolver</p>
+                <h1 id="scannerTitle">Scan object marker</h1>
+                <p>Choose a scan type. QR/barcode and OCR text scans are separate, then resolve only against OLML files already saved in this browser-local library.</p>
+              </div>
+              <button class="primary-action compact" id="scanBackButton" type="button">Back</button>
+            </div>
+            <div class="scanner-stage">
+              <video id="scanVideo" autoplay muted playsinline></video>
+              <canvas id="scanCanvas" hidden></canvas>
+            </div>
+            <div class="scanner-controls">
+              <button class="primary-action compact" id="startCodeScanButton" type="button">Scan QR / Barcode</button>
+              <button class="primary-action compact" id="startOcrScanButton" type="button">Scan OCR Text</button>
+              <button class="primary-action compact" id="stopScanButton" type="button" disabled>Stop Scan</button>
+            </div>
+            <p class="small-muted" id="scanStatus" aria-live="polite">Choose QR / Barcode or OCR Text, then hold that marker inside the frame.</p>
+            <div class="scan-result" id="scanResult" aria-live="polite"></div>
+          </section>
+
+          <section class="editor hidden" id="editor">
+            <form class="writer-board" id="packageForm">
+              <section class="writer-card object-card">
+                <h2>Object & Collection</h2>
+                <div class="object-collection-grid">
+                  <div class="object-form-column">
+                    <label for="objectTitle">Object Title</label>
+                    <input id="objectTitle" name="objectTitle" type="text" placeholder="Lab Microscope A">
+                    <label for="objectDescription">Object Description <span>(Optional)</span></label>
+                    <textarea id="objectDescription" name="objectDescription" rows="3" placeholder="A Short Object Note"></textarea>
+                    <div class="object-draft-warning-slot" id="writerObjectWarning"></div>
+                  </div>
+                  <div class="collection-form-column">
+                    <label for="collectionTitle">Collection Title <span>(Optional)</span></label>
+                    <input id="collectionTitle" name="collectionTitle" type="text" placeholder="Setup Manual Package">
+                    <label for="collectionDescription">Collection Description <span>(Optional)</span></label>
+                    <textarea id="collectionDescription" name="collectionDescription" rows="3" placeholder="Description for this .olml file"></textarea>
+                  </div>
+                </div>
+              </section>
+
+              <section class="writer-card marker-card-editor">
+                <h2>Object Marker</h2>
+                <div class="marker-editor-grid">
+                  <div class="marker-type-panel">
+                    <label for="markerType">Marker Type</label>
+                    <select id="markerType" size="4">
+                      <option value="qr">QR</option>
+                      <option value="nfc">NFC</option>
+                      <option value="image-reference">AR Image Ref</option>
+                      <option value="text-marker">OCR Text Marker</option>
+                    </select>
+                  </div>
+                  <div class="marker-evidence-panel">
+                    <div class="qr-auto-panel" id="qrAutoPanel">
+                      <div class="generated-marker-preview" id="qrAutoPreview"></div>
+                      <strong>Auto-Generate QR Code</strong>
+                    </div>
+                    <div class="marker-evidence-text" id="markerEvidenceTextGroup">
+                      <label for="markerEvidence" id="markerEvidenceTextLabel">Marker Evidence</label>
+                      <textarea id="markerEvidence" rows="3" placeholder="Marker Value Or Marker Text"></textarea>
+                    </div>
+                    <div class="marker-evidence-file hidden" id="markerEvidenceFileGroup">
+                      <label id="markerEvidenceFileLabel">Marker Image</label>
+                      <label class="evidence-file-drop-zone" id="markerEvidenceFileDropZone">
+                        <input id="markerEvidenceFileInput" type="file" accept="image/*">
+                        <strong id="markerEvidenceFileTitle">Choose Image</strong>
+                        <span id="markerEvidenceFileHint">Attach the image used as marker evidence.</span>
+                      </label>
+                      <div class="evidence-summary" id="markerEvidenceFileSummary">No image attached.</div>
+                    </div>
+                    <p class="object-id-note" id="markerPayload">object.id</p>
+                  </div>
+                  <div class="marker-help-panel">
+                    <button class="primary-action compact add-marker-action" id="addObjectMarkerButton" type="button">Add New Marker</button>
+                  </div>
+                </div>
+                <p class="small-muted marker-session-tip" id="markerHelp">QR is generated from object.id.</p>
+                <div class="additional-marker-editors" id="additionalMarkerEditors"></div>
+                <div class="object-draft-warning-slot" id="writerMarkerWarning"></div>
+                <input id="markerTarget" type="hidden" readonly>
+              </section>
+
+              <section class="writer-card memory-card-editor">
+                <div class="memory-editor-grid">
+                  <div class="memory-fields-column">
+                    <h2>Memory</h2>
+                    <label for="memoryTitle">Memory Title</label>
+                    <input id="memoryTitle" name="memoryTitle" type="text" placeholder="Setup Notes">
+                    <label for="memoryTime">Memory Time <span>(Optional)</span></label>
+                    <input id="memoryTime" name="memoryTime" type="text" placeholder="2026-08-03 or April 2026">
+                    <label for="memoryPlace">Memory Place <span>(Optional)</span></label>
+                    <input id="memoryPlace" name="memoryPlace" type="text" placeholder="Dublin lab">
+                    <label for="memoryNote">Memory Note <span>(Optional)</span></label>
+                    <textarea id="memoryNote" name="memoryNote" rows="4" placeholder="Memory-Bearing Note Or Story"></textarea>
+                  </div>
+                  <div class="memory-assets-column">
+                    <h2>Memory Assets</h2>
+                    <label class="asset-drop-zone" id="assetDropZone">
+                      <input id="assetInput" type="file" multiple>
+                      <strong>Drag Files Here Or Click To Add</strong>
+                      <span>Images, Video, Audio, Documents, Models, URL Notes, Or Other Files.</span>
+                    </label>
+                    <section class="online-asset-editor">
+                      <label for="onlineAssetUrl">Online Asset URL</label>
+                      <div class="url-entry-row">
+                        <input id="onlineAssetUrl" type="url" placeholder="https://example.com/image-or-video.mp4">
+                        <button id="addOnlineAssetButton" class="subtle inline-action" type="button">Add URL</button>
+                      </div>
+                    </section>
+                    <div class="asset-summary" id="assetSizeSummary">No attached files. Text-only memory is valid.</div>
+                    <section class="asset-details-panel hidden" id="assetDetailsPanel">
+                      <ul class="asset-list" id="assetList"></ul>
+                    </section>
+                  </div>
+                </div>
+              </section>
+
+              <!-- Hidden in the New File view for now; keep these DOM hooks for ID, hash, and export wiring. -->
+              <section class="writer-card id-card writer-hidden-utility">
+                <div class="field-row readonly-row">
+                  <label for="olmlId">olml.id</label>
+                  <input id="olmlId" name="olmlId" type="text" readonly>
+                </div>
+                <div class="field-row readonly-row">
+                  <label for="objectId">object.id</label>
+                  <input id="objectId" name="objectId" type="text" readonly>
+                </div>
+                <div class="field-row readonly-row">
+                  <label for="memoryId">memory.id</label>
+                  <input id="memoryId" name="memoryId" type="text" readonly>
+                </div>
+                <p class="small-muted">IDs are generated once, opaque, immutable, and never title-derived.</p>
+              </section>
+
+              <!-- Hidden in the New File view for now; keep the preview node for existing manifest update code. -->
+              <section class="writer-card manifest-panel writer-hidden-utility">
+                <div class="panel-title">Link / manifest preview</div>
+                <pre id="jsonPreview"></pre>
+              </section>
+
+              <section class="writer-actions">
+                <button id="saveButton" class="primary-action compact" type="button">Save & Export Current Collection</button>
+                <button id="discardButton" type="button">Discard</button>
+              </section>
+            </form>
+          </section>
+
+          <section class="reader hidden" id="reader">
+            <div class="reader-content" id="readerContent"></div>
+            <input id="readerAssetInput" type="file" multiple hidden>
+            <input id="readerMarkerImageInput" type="file" accept="image/*" hidden>
+          </section>
+        </section>
+
+        <aside class="inspector">
+          <section class="inspector-view" id="validationView">
+            <h2>Validation</h2>
+            <div class="score-row">
+              <div><strong id="warningCount">0</strong><span>Warnings</span></div>
+              <div><strong id="errorCount">0</strong><span>Errors</span></div>
+              <div><strong id="infoCount">0</strong><span>Info</span></div>
+            </div>
+            <div class="status-axis-grid" id="statusAxisGrid" aria-live="polite"></div>
+            <p class="small-muted">Errors mean the package structure is broken. Warnings mean it can still export, but a human should review the ambiguity or deployment risk.</p>
+            <div id="validationSummary" class="validation-summary" aria-live="polite"></div>
+            <div id="validationList" class="validation-list" aria-live="polite"></div>
+            <button class="full-width subtle hidden" id="postponeConflictButton" type="button">Postpone Conflict Reminder</button>
+            <button class="full-width" id="validateButton" type="button">Run Validation</button>
+            <p class="small-muted" id="lastRun">Not validated yet</p>
+          </section>
+
+          <section class="inspector-view hidden utility-only" id="markerView">
+            <h2>Object Marker Evidence</h2>
+            <p class="small-muted">Paste an olml.id, Object Marker value, or catalog URL to search the browser-local library catalog.</p>
+            <label for="resolveInput">Search Object Marker or olml.id</label>
+            <textarea id="resolveInput" rows="3" placeholder="Paste olml.id, NFC/OCR value, or catalog URL"></textarea>
+            <button class="full-width" id="resolveButton" type="button">Search Object Marker</button>
+            <div id="resolveResult" class="resolve-result"></div>
+          </section>
+
+          <section class="inspector-view hidden utility-only" id="libraryView">
+            <h2>Library</h2>
+            <p class="small-muted">Saved browser-local packages are indexed by olml.id. Remote locations are catalog state, not part of a single .olml package.</p>
+            <div class="library-tools">
+              <label for="publicationUrl">Publication location for current package</label>
+              <input id="publicationUrl" type="url" placeholder="https://example.com/mug.olml">
+              <button class="full-width subtle" id="savePublicationButton" type="button">Save Location To Catalog</button>
+              <div class="inline-buttons">
+                <button id="exportCatalogButton" type="button">Export Catalog JSON</button>
+                <button id="importCatalogButton" type="button">Import Catalog JSON</button>
+              </div>
+              <input id="catalogInput" type="file" accept="application/json,.json" hidden>
+            </div>
+            <div id="libraryList" class="library-list"></div>
+            <button class="full-width subtle" id="refreshLibraryButton" type="button">Refresh Library</button>
+          </section>
+
+          <section class="library-box">
+            <h2>Library</h2>
+            <p class="library-origin-hint">Local Library is saved by browser + port. If you open the app on a different port, import your catalog to restore logs.</p>
+            <div class="library-switcher" role="tablist" aria-label="Library panel">
+              <button class="library-tab active" id="libraryTabButton" type="button" role="tab" aria-selected="true" aria-controls="libraryTabPanel" data-library-tab="library">Library</button>
+              <button class="library-tab" id="activityTabButton" type="button" role="tab" aria-selected="false" aria-controls="activityTabPanel" data-library-tab="activity">Activity</button>
+            </div>
+            <div class="library-tab-panel" id="libraryTabPanel" role="tabpanel" aria-labelledby="libraryTabButton">
+              <label class="library-search" for="librarySearch">
+                <input id="librarySearch" type="search" placeholder="Search Library">
+                <span aria-hidden="true">⌕</span>
+              </label>
+              <div id="libraryObjectProfile" class="library-object-profile"></div>
+              <div id="historyLibraryList" class="history-library-list"></div>
+              <div class="inline-buttons library-catalog-actions">
+                <button id="importCatalogFromLibraryButton" type="button">Import Catalog</button>
+                <button id="exportCatalogFromLibraryButton" type="button">Export Catalog</button>
+              </div>
+            </div>
+            <div class="library-tab-panel hidden" id="activityTabPanel" role="tabpanel" aria-labelledby="activityTabButton">
+              <div class="library-activity-list" id="libraryActivityList"></div>
+            </div>
+            <div class="pending-conflicts-list" id="pendingConflictsList"></div>
+          </section>
+
+          <section class="about-box">
+            <div class="conformance-card">
+              <div class="file-icon">.olml</div>
+              <div>This package conforms to the current OLML Resolver MVP shape.</div>
+              <a class="text-link" href="https://olml.org/" target="_blank" rel="noreferrer">View Manifest</a>
+            </div>
+            <p>Project Github: <a href="https://github.com/Clarepuffinwalker/OLML" target="_blank" rel="noreferrer">https://github.com/Clarepuffinwalker/OLML</a></p>
+            <p>Resolver Github: <a href="https://github.com/Clarepuffinwalker/OLMLResolver" target="_blank" rel="noreferrer">https://github.com/Clarepuffinwalker/OLMLResolver</a></p>
+            <p>Website: <a href="https://olml.org" target="_blank" rel="noreferrer">https://olml.org</a></p>
+            <a class="text-link" href="https://github.com/Clarepuffinwalker/OLMLResolver" target="_blank" rel="noreferrer">Check on Update</a>
+            <p class="version-line">Ver 0.1.0</p>
+          </section>
+        </aside>
+      </main>
+    </div>
+
+    <script src="./olml-state.js"></script>
+    <script src="./app.js?v=separate-code-and-ocr-scans-20261030"></script>
+  </body>
+</html>
